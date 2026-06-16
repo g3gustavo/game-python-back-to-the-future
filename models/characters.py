@@ -1,5 +1,6 @@
 import pygame
 from models.entity import Entity
+from models.projectile import Shot
 
 class Player(Entity):
     def __init__(self, x: int, y: int):
@@ -38,8 +39,10 @@ class Player(Entity):
             self.rect.topleft = (self.x, self.y)
 
     def shoot(self):
-        """Será implementado na Sprint 2 (Espaço)"""
-        pass
+        """Instancia um novo tiro saindo da frente do jogador"""
+        # Cria o tiro na ponta direita do rect do player e centralizado na altura
+        tiro = Shot(self.rect.right, self.rect.centery - 2)
+        return tiro
 
     def take_damage(self):
         """Reduz a vida do jogador"""
