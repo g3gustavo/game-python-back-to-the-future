@@ -5,11 +5,8 @@ from models.projectile import Shot
 class Player(Entity):
     def __init__(self, x: int, y: int):
         # Chamamos o construtor da classe mãe (Entity)
-        super().__init__(x, y)
-        
-        # Mudamos a cor do bloco do Player para Verde para sabermos quem é quem no teste
-        self.image.fill((0, 255, 0))
-        
+        super().__init__(x, y, image_path="assets/player.png")
+              
         # Atributos específicos do Player definidos no seu UML
         self.lives = 3
         self.score = 0
@@ -51,10 +48,7 @@ class Player(Entity):
 
 class Enemy(Entity):
     def __init__(self, x: int, y: int, speed: int = 5):
-        super().__init__(x, y)
-        
-        # Mudamos a cor do bloco do Inimigo para Vermelho (Capangas do Biff)
-        self.image.fill((255, 0, 0))
+        super().__init__(x, y, image_path="assets/enemy.png")
         
         # Atributo específico do Inimigo definido no seu UML
         self.speed = speed

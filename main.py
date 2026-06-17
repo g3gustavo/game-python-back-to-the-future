@@ -3,6 +3,7 @@ import sys
 from models.characters import Player, Enemy
 from models.projectile import Shot
 from models.factory import EnemyFactory
+from models.database import DatabaseProxy
 
 class Game:
     def __init__(self):
@@ -32,28 +33,53 @@ class Game:
         self.SPAWN_ENEMY_EVENT = pygame.USEREVENT + 1
         pygame.time.set_timer(self.SPAWN_ENEMY_EVENT, 2000) # Dispara a cada 2000ms
 
+        # Inicializa o Proxy do Banco de Dados
+        self.db = DatabaseProxy()
+
+        # Controle de Estado do Jogo: 'MENU' ou 'PLAYING'
+        self.game_state = "MENU"
+
+        # Inicialização de Fontes para escrever textos na tela
+        pygame.font.init()
+        self.font = pygame.font.SysFont("Arial", 30)
+        self.title_font = pygame.font.SysFont("Arial", 50, bold=True)
+
+    def reset_game(self):
+        """Reseta o estado do jogo para uma nova partida"""
+        self.player = Player(100, 400) # Cria um novo Player com 3 vidas e score 0
+        self.enemies = []              # Limpa os inimigos antigos da tela
+        self.shots = []                # Limpa os tiros antigos
+    
     def check_events(self):
         """Captura os eventos do teclado e do sistema (Método do UML)"""
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.is_running = False
 
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_w:
-                    self.player.jump()
-                if event.key == pygame.K_SPACE:
-                    novo_tiro = self.player.shoot()
-                    self.shots.append(novo_tiro)
+            # Eventos se estiver no MENU
+            if self.game_state == "MENU":
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_RETURN: # Apertou Enter, começa o jogo
+                        self.game_state = "PLAYING"
 
-            # Captura o sinal do relógio para criar inimigos
-            if event.type == self.SPAWN_ENEMY_EVENT:
-                # Usamos a fábrica para gerar na borda direita (X=850) no chão (Y=400)
-                # Teste mudar o ano para 2015 ou 1885 para ver o comportamento mudar!
-                novo_inimigo = EnemyFactory.create_enemy(self.current_level * 2015, 850, 400)
-                self.enemies.append(novo_inimigo)
+            # Eventos se estiver JOGANDO )
+            elif self.game_state == "PLAYING":
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_w:
+                        self.player.jump()
+                    if event.key == pygame.K_SPACE:
+                        novo_tiro = self.player.shoot()
+                        self.shots.append(novo_tiro)
+
+                if event.type == self.SPAWN_ENEMY_EVENT:
+                    novo_inimigo = EnemyFactory.create_enemy(self.current_level * 1955, 850, 400)
+                    self.enemies.append(novo_inimigo)
 
     def update(self):
         """Atualiza a lógica interna e a física dos personagens"""
+        if self.game_state != "PLAYING":
+            return # Se não estiver jogando, não atualiza física nem colisões
+        
         # Captura as teclas que estão sendo pressionadas continuamente (A e D)
         keys = pygame.key.get_pressed()
         
@@ -95,28 +121,64 @@ class Game:
         for enemy in self.enemies[:]:
             if enemy.rect.colliderect(self.player.rect):
                 self.enemies.remove(enemy)
-                self.player.take_damage() # Perde vida!
+                self.player.take_damage()
                 print(f"Marty foi atingido! Vidas restantes: {self.player.lives}")
                 
                 if self.player.lives <= 0:
-                    print("GAME OVER! A linha do tempo foi destruída!")
-                    self.is_running = False # Fecha o jogo se perder todas as vidas
+                    print("GAME OVER! Voltando para o Menu Principal...")
+                    # Salva o recorde no banco SQLite via Proxy
+                    self.db.save_score("Marty McFly", self.player.score) 
+                    
+                    # Em vez de fechar o jogo, reseta e volta pro Menu!
+                    self.reset_game()
+                    self.game_state = "MENU"
 
 
     def draw(self):
         """Renderiza os elementos gráficos na tela (Método do UML)"""
-        self.screen.fill((0, 0, 0)) # Fundo preto clássico de espaço/fase inicial
-        
-        # Desenha o Player (Bloco Verde) e o Inimigo (Bloco Vermelho)
-        self.player.draw(self.screen)
-        # Desenha todos os inimigos ativos
-        for enemy in self.enemies:
-            enemy.draw(self.screen)
+        self.screen.fill((0, 0, 0)) # Fundo preto
 
-        # Desenha todos os tiros ativos
-        for shot in self.shots:
-            shot.draw(self.screen)
-        
+        if self.game_state == "MENU":
+            # Desenha a tela de Menu Inicial e Instruções Obrigatórias do trabalho
+            title_text = self.title_font.render("BACK TO THE FUTURE: TIME CRISIS", True, (255, 128, 0))
+            instruct_text = self.font.render("Pressione [ENTER] para Iniciar o Jogo", True, (255, 255, 255))
+
+            # Comandos Obrigatórios escritos textualmente na tela
+            cmd_w = self.font.render("[W] - Pular", True, (200, 200, 200))
+            cmd_ad = self.font.render("[A / D] - Mover para os Lados", True, (200, 200, 200))
+            cmd_space = self.font.render("[ESPAÇO] - Atirar", True, (200, 200, 200))
+
+            # Renderiza os recordes do Banco de Dados no Menu!
+            score_title = self.font.render("--- TOP RECORDES ---", True, (255, 255, 0))
+            self.screen.blit(title_text, (50, 80))
+            self.screen.blit(instruct_text, (180, 180))
+            self.screen.blit(cmd_w, (280, 260))
+            self.screen.blit(cmd_ad, (280, 300))
+            self.screen.blit(cmd_space, (280, 340))
+            self.screen.blit(score_title, (270, 410))
+
+            # Loop para listar os recordes vindos do SQLite
+            top_scores = self.db.get_top_scores(3)
+            y_offset = 450
+            for idx, row in enumerate(top_scores):
+                row_text = self.font.render(f"{idx+1}. {row[0]} - {row[1]} pts", True, (0, 255, 255))
+                self.screen.blit(row_text, (300, y_offset))
+                y_offset += 35
+
+        elif self.game_state == "PLAYING":
+            # Desenha os elementos do jogo que você já fez
+            self.player.draw(self.screen)
+            for enemy in self.enemies:
+                enemy.draw(self.screen)
+            for shot in self.shots:
+                shot.draw(self.screen)
+
+        # Desenha o Placar e as Vidas na tela durante a gameplay
+        score_display = self.font.render(f"Pontos: {self.player.score}", True, (255, 255, 255))
+        lives_display = self.font.render(f"Vidas: {self.player.lives}", True, (255, 0, 0))
+        self.screen.blit(score_display, (20, 20))
+        self.screen.blit(lives_display, (650, 20))
+
         pygame.display.flip()
 
     def run_game(self):
@@ -125,8 +187,7 @@ class Game:
             self.check_events()
             self.update()
             self.draw()
-            
-            self.clock.tick(60) # Limita o jogo a 60 Frames Por Segundo (FPS)
+            self.clock.tick(60) # Limita o jogo a 60 FPS
             
         pygame.quit()
         sys.exit()

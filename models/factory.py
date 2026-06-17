@@ -9,19 +9,16 @@ class EnemyFactory:
         if year == 1955:
             # Capangas do Biff (Inimigo padrão, velocidade média)
             enemy = Enemy(x, y, speed=random.randint(3, 5))
-            enemy.image.fill((255, 0, 0)) # Vermelho para o Biff
             return enemy
             
         elif year == 2015:
             # Drones futuristas (Mais rápidos, voam um pouco mais alto)
             enemy = Enemy(x, y - random.randint(30, 80), speed=random.randint(6, 8))
-            enemy.image.fill((0, 0, 255)) # Azul para Drones futuristas
             return enemy
             
         elif year == 1885:
             # Bandidos do Velho Oeste (Mais lentos, mas aguentam mais tranco no futuro)
             enemy = Enemy(x, y, speed=random.randint(2, 4))
-            enemy.image.fill((139, 69, 19)) # Marrom para o Velho Oeste
             return enemy
             
         else:
