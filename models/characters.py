@@ -56,3 +56,43 @@ class Enemy(Entity):
     def update_behavior(self):
         """Faz o inimigo andar automaticamente para a esquerda"""
         self.move(-self.speed, 0)
+
+class Boss(Enemy):
+    def __init__(self, x: int, y: int):
+        # O Boss começa com velocidade 3, mas vamos carregar o sprite dele do Velho Oeste
+        super().__init__(x, y, speed=3)
+        
+        # 🟢 ESPECIALIZAÇÃO: O Boss usa uma imagem própria
+        # (Se não tiver a imagem ainda, a classe mãe Entity cria o bloco padrão)
+        try:
+            self.image = pygame.image.load("assets/boss.png").convert_alpha()
+        except:
+            self.image = pygame.Surface((80, 80)) # O Boss é maior que os capangas!
+            self.image.fill((139, 0, 0)) # Vermelho Escuro / Marrom
+            
+        self.rect = self.image.get_rect()
+        self.rect.topleft = (x, y)
+        
+        # Atributos exclusivos do Chefe do seu UML
+        self.hp = 5 # O Boss precisa levar 5 tiros para morrer!
+        self.special_timer = 0
+
+    def update_behavior(self):
+        """Faz o Boss se movimentar de um jeito diferente (vai e volta na tela)"""
+        self.move(-self.speed, 0)
+        
+        # Se ele chegar muito perto do Marty, ele recua um pouco para continuar atirando/atacando
+        if self.x < 400:
+            self.speed = -3 # Muda a direção para a direita
+        if self.x > 750:
+            self.speed = 3  # Muda a direção de volta para a esquerda
+
+    def special_attack(self):
+        """Lógica para o ataque especial (será mapeado na IA/Sprint Final se necessário)"""
+        pass
+
+    def take_damage(self):
+        """O Boss perde 1 ponto de vida por tiro"""
+        self.hp -= 1
+        return self.hp <= 0 # Retorna True se o Boss morreu
+    

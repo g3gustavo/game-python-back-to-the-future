@@ -1,9 +1,10 @@
 import pygame
 import sys
-from models.characters import Player, Enemy
+from models.characters import Player, Enemy, Boss
 from models.projectile import Shot
 from models.factory import EnemyFactory
 from models.database import DatabaseProxy
+from models.scenery import Collectible, Tower
 
 class Game:
     def __init__(self):
@@ -44,11 +45,40 @@ class Game:
         self.font = pygame.font.SysFont("Arial", 30)
         self.title_font = pygame.font.SysFont("Arial", 50, bold=True)
 
-    def reset_game(self):
-        """Reseta o estado do jogo para uma nova partida"""
-        self.player = Player(100, 400) # Cria um novo Player com 3 vidas e score 0
-        self.enemies = []              # Limpa os inimigos antigos da tela
-        self.shots = []                # Limpa os tiros antigos
+        # Controle de Itens do Capacitor de Fluxo
+        self.collected_items = 0
+        self.items_on_screen = [
+            Collectible(300, 400), # Item 1
+            Collectible(500, 300), # Item 2 (mais alto para pular)
+            Collectible(700, 400)  # Item 3
+        ]
+
+        # Instancia a Torre do Relógio no final do cenário (fora da tela inicialmente)
+        self.clock_tower = Tower(750, 350) 
+        self.tower_spawned = False
+
+        # Controle para garantir que o Boss só apareça uma vez por fase (pode ser usado futuramente para a Fase 3)
+        self.boss_spawned = False
+
+    def reset_game(self, game_over=False):
+        """Reseta o estado para uma nova fase ou reinicia tudo em caso de Game Over"""
+        if game_over:
+            self.current_level = 1
+            self.player = Player(100, 400)
+        else:
+            # Mantém os pontos e vidas do Marty, mas reseta a posição dele no começo da tela
+            self.player.x = 100
+            self.player.y = 400
+            self.player.rect.topleft = (100, 400)
+
+        self.enemies = []              # Limpa os inimigos da fase anterior
+        self.shots = []                # Limpa os tiros da fase anterior
+        self.collected_items = 0       # Zera os itens para a nova fase
+        self.tower_spawned = False
+        self.boss_spawned = False
+        
+        # Recria os itens para a nova fase (podem ser em posições diferentes no futuro!)
+        self.items_on_screen = [Collectible(300, 400), Collectible(500, 300), Collectible(700, 400)]
     
     def check_events(self):
         """Captura os eventos do teclado e do sistema (Método do UML)"""
@@ -72,8 +102,19 @@ class Game:
                         self.shots.append(novo_tiro)
 
                 if event.type == self.SPAWN_ENEMY_EVENT:
-                    novo_inimigo = EnemyFactory.create_enemy(self.current_level * 1955, 850, 400)
-                    self.enemies.append(novo_inimigo)
+                    year_map = {1: 1955, 2: 2015, 3: 1885}
+                    fase_ano = year_map.get(self.current_level, 1955)
+
+                    if fase_ano == 1885:
+                        # Se for o Velho Oeste e o Boss ainda não nasceu, invoca ele!
+                        if not self.boss_spawned:
+                            novo_boss = EnemyFactory.create_boss(750, 370) # Y um pouco mais alto porque ele é maior
+                            self.enemies.append(novo_boss)
+                            self.boss_spawned = True
+                    else:
+                        # Nas fases 1 e 2, nascem os capangas/drones normais a cada 2s
+                        novo_inimigo = EnemyFactory.create_enemy(fase_ano, 850, 400)
+                        self.enemies.append(novo_inimigo)
 
     def update(self):
         """Atualiza a lógica interna e a física dos personagens"""
@@ -107,15 +148,29 @@ class Game:
 
         #DETECÇÃO DE COLISÕES
 
-        # 1. Tiro atinge Inimigo
-        for shot in self.shots[:]: # Usamos [:] para fazer uma cópia da lista e evitar bugs ao remover itens
+        # 1. Tiro atinge Inimigo / Boss
+        for shot in self.shots[:]:
             for enemy in self.enemies[:]:
                 if shot.rect.colliderect(enemy.rect):
                     self.shots.remove(shot)
-                    self.enemies.remove(enemy)
-                    self.player.score += 100 # Ganha pontos!
-                    print(f"Inimigo derrotado! Pontuação: {self.player.score}")
-                    break # Sai do loop interno do inimigo já que o tiro sumiu
+
+                    # 🟢 VERIFICAÇÃO POLIMÓRFICA: Se for o Boss, rodamos o take_damage dele
+                    if isinstance(enemy, Boss):
+                        morreu = enemy.take_damage()
+                        print(f"🤠 Buford Tannen foi atingido! HP restante: {enemy.hp}")
+                        if morreu:
+                            self.enemies.remove(enemy)
+                            self.player.score += 1000 # Super bônus!
+                            print("🏆 VITÓRIA TEMPORAL! Você derrotou o Cachorro Louco!")
+                            self.game_state = "MENU" # Volta pro menu vitorioso
+                            self.reset_game(game_over=True) 
+                    else:
+                        # Inimigo comum morre com 1 tiro só
+                        self.enemies.remove(enemy)
+                        self.player.score += 100
+                        print(f"Inimigo derrotado! Pontuação: {self.player.score}")
+
+                    break
 
         # 2. Inimigo atinge o Player
         for enemy in self.enemies[:]:
@@ -125,14 +180,36 @@ class Game:
                 print(f"Marty foi atingido! Vidas restantes: {self.player.lives}")
                 
                 if self.player.lives <= 0:
-                    print("GAME OVER! Voltando para o Menu Principal...")
-                    # Salva o recorde no banco SQLite via Proxy
+                    print("GAME OVER!")
                     self.db.save_score("Marty McFly", self.player.score) 
-                    
-                    # Em vez de fechar o jogo, reseta e volta pro Menu!
-                    self.reset_game()
+                    self.reset_game(game_over=True) # 🟢 Reseta tudo para o nível 1
                     self.game_state = "MENU"
 
+        # 3. Coleta de Itens (Capacitor de Fluxo)
+        for item in self.items_on_screen[:]:
+            if item.rect.colliderect(self.player.rect):
+                self.items_on_screen.remove(item)
+                self.collected_items += 1
+                self.player.score += 200 # Bônus por coletar
+                print(f"Item coletado! {self.collected_items}/3 Capacitores de Fluxo.")
+
+        # Se coletou os 3, a Torre do Relógio se torna "ativa/visível"
+        if self.collected_items == 3:
+            self.tower_spawned = True
+
+        # 4. Condição de Vitória da Fase 1 e Transição
+        if self.tower_spawned:
+            if self.player.rect.colliderect(self.clock_tower.rect):
+                if self.current_level == 1:
+                    print("⚡ Avançando para a Fase 2 (2015)!")
+                    self.current_level = 2
+                    self.reset_game(game_over=False) # Limpa a tela mantendo os dados do player
+                    # Continuamos no estado 'PLAYING', o jogo não para!
+                
+                elif self.current_level == 2:
+                    print("⚡ Avançando para a Fase 3 (1885)!")
+                    self.current_level = 3
+                    self.reset_game(game_over=False)
 
     def draw(self):
         """Renderiza os elementos gráficos na tela (Método do UML)"""
@@ -166,12 +243,16 @@ class Game:
                 y_offset += 35
 
         elif self.game_state == "PLAYING":
-            # Desenha os elementos do jogo que você já fez
-            self.player.draw(self.screen)
+            # Desenha o Player, os inimigos, os tiros e os itens na tela durante a gameplay
+            self.player.draw(self.screen) # Desenha o Player na tela
             for enemy in self.enemies:
-                enemy.draw(self.screen)
+                enemy.draw(self.screen) # Desenha cada inimigo na tela
             for shot in self.shots:
-                shot.draw(self.screen)
+                shot.draw(self.screen) # Desenha cada tiro na tela
+            for item in self.items_on_screen:
+                item.draw(self.screen) # Desenha os itens do Capacitor de Fluxo na tela
+            if self.tower_spawned:
+                self.clock_tower.draw(self.screen) # Desenha a Torre do Relógio se ela tiver sido "ativada" (coletou os 3 itens)
 
         # Desenha o Placar e as Vidas na tela durante a gameplay
         score_display = self.font.render(f"Pontos: {self.player.score}", True, (255, 255, 255))

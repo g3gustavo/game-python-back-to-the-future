@@ -1,6 +1,7 @@
 import pygame
 import random
 from models.characters import Enemy
+from models.characters import Enemy, Boss 
 
 class EnemyFactory:
     @staticmethod
@@ -24,3 +25,9 @@ class EnemyFactory:
         else:
             # Caso dê algum ano inválido, retorna um inimigo padrão
             return Enemy(x, y, speed=4)
+
+    # Para a Fase 3, vamos criar um Boss especial! 
+    @staticmethod
+    def create_boss(x: int, y: int) -> Boss:
+        """Cria o grande vilão Buford Tannen para a Fase 3"""
+        return Boss(x, y)
