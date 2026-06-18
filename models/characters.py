@@ -15,25 +15,39 @@ class Player(Entity):
         self.gravity = 1
         self.velocity_y = 0
 
-    def jump(self):
-        """Lógica do pulo (W)"""
+    def jump(self, custom_jump_speed: int = None, direction_x: int = 0):
+        """Lógica do pulo (W) - Aceita velocidade customizada e impulso horizontal"""
         if not self.is_jumping:
             self.is_jumping = True
-            self.velocity_y = self.jump_speed
+            
+            # 1. Ajusta a altura do pulo (Eixo Y)
+            if custom_jump_speed is not None:
+                self.velocity_y = custom_jump_speed
+            else:
+                self.velocity_y = self.jump_speed
+
+            # 2. 🛹 NOVIDADE: Dá impulso para frente (Eixo X) baseado na direção atual
+            # Se for na Fase 2 (impulso customizado), o empurrão para a frente é ainda maior!
+            if custom_jump_speed is not None: 
+                self.velocity_x = direction_x * 8  # Impulso forte do Hoverboard
+            else:
+                self.velocity_x = direction_x * 4  # Impulso normal na Fase 1
 
     def update_physics(self):
-        """Aplica gravidade ao pulo do jogador"""
+        """Aplica gravidade e inércia horizontal ao pulo do jogador"""
         if self.is_jumping:
             self.velocity_y += self.gravity
             self.y += self.velocity_y
+            self.x += self.velocity_x # 🛹 Aplica o impulso horizontal no ar!
             
-            # Chão temporário para o bloco não cair no infinito
+            # Chão temporário
             if self.y >= 400: 
                 self.y = 400
                 self.is_jumping = False
                 self.velocity_y = 0
+                self.velocity_x = 0 # Para de se mover ao tocar o chão
                 
-            self.rect.topleft = (self.x, self.y)
+        self.rect.topleft = (self.x, self.y)
 
     def shoot(self):
         """Instancia um novo tiro saindo da frente do jogador"""
@@ -83,9 +97,9 @@ class Boss(Enemy):
         
         # Se ele chegar muito perto do Marty, ele recua um pouco para continuar atirando/atacando
         if self.x < 400:
-            self.speed = -3 # Muda a direção para a direita
+            self.speed = -2 # Muda a direção para a direita
         if self.x > 750:
-            self.speed = 3  # Muda a direção de volta para a esquerda
+            self.speed = 2  # Muda a direção de volta para a esquerda
 
     def special_attack(self):
         """Lógica para o ataque especial (será mapeado na IA/Sprint Final se necessário)"""
