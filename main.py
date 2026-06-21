@@ -9,6 +9,22 @@ from models.scenery import Collectible, Tower
 class Game:
     def __init__(self):
         pygame.init()
+
+        # Inicializa o sistema de áudio (geralmente já vem junto com o pygame.init())
+        pygame.mixer.init()
+
+        # 1. CARREGAR EFEITOS SONOROS (Objetos Sound)
+        self.som_pulo = pygame.mixer.Sound("sons/pulo.wav")
+        self.som_tiro = pygame.mixer.Sound("sons/tiro.wav")
+        
+        # Ajuste de volume individual se precisar (0.0 até 1.0)
+        self.som_pulo.set_volume(0.5)
+        self.som_tiro.set_volume(0.4)
+
+        # 2. SELEÇÃO DE MÚSICAS DE FUNDO (Dicionário para facilitar as fases)
+        self.musica_jogo = "sons/musica_geral.mp3"
+        self.musica_gameover = "sons/musica_gameover.mp3"
+        self.musica_vitoria = "sons/musica_vitoria.mp3"
         
         # Configuração da janela do jogo
         self.screen_width = 800
@@ -98,6 +114,18 @@ class Game:
         except Exception as e:
             print(f"⚠️ Erro ao carregar telas de menu: {e}")
 
+    def tocar_musica_fundo(self, caminho_arquivo):
+        """Toca a música em loop, mas só carrega se for uma música diferente"""
+        # Verifica se a música que pediu para tocar já é a que está rodando
+        if pygame.mixer.music.get_busy():
+            # Esse truque evita reiniciar a música se ela já for a mesma
+            pass 
+            
+        pygame.mixer.music.stop()         # Para a música atual
+        pygame.mixer.music.load(caminho_arquivo)
+        pygame.mixer.music.set_volume(0.3) 
+        pygame.mixer.music.play(-1)        # O argumento -1 faz tocar em loop infinito
+
     def spawn_phase_items(self):
         """Busca a imagem correta da fase e cria os itens colecionáveis na tela"""
         self.items_on_screen = []
@@ -146,6 +174,7 @@ class Game:
                 # Se estiver na tela inicial e apertar ENTER, o jogo começa
                 if self.game_state == "START" and event.key == pygame.K_RETURN:
                     self.game_state = "PLAYING"
+                    self.tocar_musica_fundo(self.musica_jogo)
                     self.reset_game(game_over=True) # Começa do zero
                 
                 # Se deu Game Over ou Vitória e apertar ENTER, volta para o início
@@ -159,6 +188,7 @@ class Game:
                     self.level_time -= 1
                     if self.level_time <= 0:
                         self.game_state = "GAMEOVER"
+                        self.tocar_musica_fundo(self.musica_gameover)
 
                 # Spawn automático de inimigos
                 if event.type == self.SPAWN_ENEMY_EVENT:
@@ -184,6 +214,7 @@ class Game:
                 # 🟢 CORRIGIDO: Captura de Pulo e Tiro perfeitamente alinhadas ao estado PLAYING
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_w:
+                        self.som_pulo.play() # 🔊 Toca o som do pulo imediatamente
                         keys = pygame.key.get_pressed()
                         direcao = 0
                         if keys[pygame.K_d]: direcao = 1   
@@ -195,6 +226,7 @@ class Game:
                             self.player.jump(direction_x=direcao) 
                     
                     if event.key == pygame.K_SPACE:
+                        self.som_tiro.play() # 🔊 Toca o som do tiro imediatamente
                         novo_tiro = self.player.shoot()
                         self.shots.append(novo_tiro)
 
@@ -249,6 +281,7 @@ class Game:
                                     if enemy in self.enemies:
                                         self.enemies.remove(enemy)
                                     self.player.score += 1000 
+                                    self.tocar_musica_fundo(self.musica_vitoria)
                                     self.game_state = "WIN"
                     else:
                         if enemy in self.enemies:
@@ -413,7 +446,6 @@ class Game:
             
             pygame.quit()
             sys.exit()
-
 
 if __name__ == "__main__":
     # Instancia o objeto do jogo e inicia o loop
