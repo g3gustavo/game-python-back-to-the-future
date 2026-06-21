@@ -2,3 +2,7 @@
 __pycache__/
 *.pyc
 procedures.md
+build/
+dist/
+*.spec
+*.db

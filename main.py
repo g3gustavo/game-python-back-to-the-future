@@ -1,5 +1,21 @@
-import pygame
+import os
 import sys
+import pygame
+import random
+import sqlite3
+
+def obter_caminho_recurso(caminho_relativo):
+    """ Retorna o caminho absoluto para o recurso usando o padrão oficial do PyInstaller """
+    try:
+        # Se for o executável, ele extrai tudo para o _MEIPASS (que já mapeia o _internal automaticamente no Python 3)
+        base_path = sys._MEIPASS
+    except Exception:
+        # Se for o VS Code, roda na raiz atual
+        base_path = os.path.abspath(".")
+    
+    caminho_limpo = caminho_relativo.lstrip("./").lstrip("../")
+    return os.path.join(base_path, caminho_limpo)
+
 from models.characters import Player, Enemy, Boss
 from models.projectile import Shot
 from models.factory import EnemyFactory
@@ -14,17 +30,17 @@ class Game:
         pygame.mixer.init()
 
         # 1. CARREGAR EFEITOS SONOROS (Objetos Sound)
-        self.som_pulo = pygame.mixer.Sound("sons/pulo.wav")
-        self.som_tiro = pygame.mixer.Sound("sons/tiro.wav")
+        self.som_pulo = pygame.mixer.Sound(obter_caminho_recurso("sons/pulo.wav"))
+        self.som_tiro = pygame.mixer.Sound(obter_caminho_recurso("sons/tiro.wav"))
         
         # Ajuste de volume individual se precisar (0.0 até 1.0)
         self.som_pulo.set_volume(0.5)
         self.som_tiro.set_volume(0.4)
 
         # 2. SELEÇÃO DE MÚSICAS DE FUNDO (Dicionário para facilitar as fases)
-        self.musica_jogo = "sons/musica_geral.mp3"
-        self.musica_gameover = "sons/musica_gameover.mp3"
-        self.musica_vitoria = "sons/musica_vitoria.mp3"
+        self.musica_jogo = obter_caminho_recurso("sons/musica_geral.mp3")
+        self.musica_gameover = obter_caminho_recurso("sons/musica_gameover.mp3")
+        self.musica_vitoria = obter_caminho_recurso("sons/musica_vitoria.mp3")
         
         # Configuração da janela do jogo
         self.screen_width = 800
@@ -67,11 +83,12 @@ class Game:
         self.boss_spawned = False
 
         # Carregamento dos backgrounds
+        # Carregamento dos backgrounds
         self.backgrounds = {}
         try:
-            self.backgrounds[1] = pygame.image.load("assets/bg_1955.png").convert()
-            self.backgrounds[2] = pygame.image.load("assets/bg_2015.png").convert()
-            self.backgrounds[3] = pygame.image.load("assets/bg_1885.png").convert()
+            self.backgrounds[1] = pygame.image.load(obter_caminho_recurso("assets/bg_1955.png")).convert()
+            self.backgrounds[2] = pygame.image.load(obter_caminho_recurso("assets/bg_2015.png")).convert()
+            self.backgrounds[3] = pygame.image.load(obter_caminho_recurso("assets/bg_1885.png")).convert()
             print("🖼️ Todos os backgrounds (.png) foram carregados com sucesso!")
         except Exception as e:
             print(f"⚠️ Erro ao carregar as imagens de fundo: {e}")
@@ -79,9 +96,9 @@ class Game:
         # Carregamento e Redimensionamento das imagens dos itens
         self.item_images = {}
         try:
-            self.item_images[1] = pygame.transform.scale(pygame.image.load("assets/capacitor.png").convert_alpha(), (40, 40))
-            self.item_images[2] = pygame.transform.scale(pygame.image.load("assets/almanaque.png").convert_alpha(), (40, 40))
-            self.item_images[3] = pygame.transform.scale(pygame.image.load("assets/foto.png").convert_alpha(), (40, 40))
+            self.item_images[1] = pygame.transform.scale(pygame.image.load(obter_caminho_recurso("assets/capacitor.png")).convert_alpha(), (40, 40))
+            self.item_images[2] = pygame.transform.scale(pygame.image.load(obter_caminho_recurso("assets/almanaque.png")).convert_alpha(), (40, 40))
+            self.item_images[3] = pygame.transform.scale(pygame.image.load(obter_caminho_recurso("assets/foto.png")).convert_alpha(), (40, 40))
             print("🔋 Itens das fases carregados com sucesso!")
         except Exception as e:
             print(f"⚠️ Erro ao carregar imagens dos itens: {e}")
@@ -95,8 +112,8 @@ class Game:
         self.enemy_images = {}
         try:
             # Substitua pelos nomes reais dos seus arquivos de imagem na pasta assets:
-            self.enemy_images[1] = pygame.transform.scale(pygame.image.load("assets/inimigo_1955.png").convert_alpha(), (104, 130))
-            self.enemy_images[2] = pygame.transform.scale(pygame.image.load("assets/inimigo_2015.png").convert_alpha(), (104, 130))
+            self.enemy_images[1] = pygame.transform.scale(pygame.image.load(obter_caminho_recurso("assets/inimigo_1955.png")).convert_alpha(), (104, 130))
+            self.enemy_images[2] = pygame.transform.scale(pygame.image.load(obter_caminho_recurso("assets/inimigo_2015.png")).convert_alpha(), (104, 130))
             self.enemy_images[3] = pygame.transform.scale(pygame.image.load("assets/inimigo_1885.png").convert_alpha(), (104, 130))
             print("🦹 Imagens dos inimigos carregadas com sucesso!")
         except Exception as e:
@@ -107,9 +124,9 @@ class Game:
         
         # Carregar as imagens das telas (adicione na pasta assets)
         try:
-            self.start_screen = pygame.transform.scale(pygame.image.load("assets/tela_inicial.png").convert(), (800, 600))
-            self.game_over_screen = pygame.transform.scale(pygame.image.load("assets/tela_gameover.png").convert(), (800, 600))
-            self.win_screen = pygame.transform.scale(pygame.image.load("assets/tela_vitoria.png").convert(), (800, 600))
+            self.start_screen = pygame.image.load(obter_caminho_recurso("assets/tela_inicial.png")).convert_alpha()
+            self.game_over_screen = pygame.image.load(obter_caminho_recurso("assets/tela_gameover.png")).convert_alpha()
+            self.win_screen = pygame.image.load(obter_caminho_recurso("assets/tela_vitoria.png")).convert_alpha()
             print("📺 Telas de menu carregadas com sucesso!")
         except Exception as e:
             print(f"⚠️ Erro ao carregar telas de menu: {e}")
@@ -141,6 +158,9 @@ class Game:
 
     def reset_game(self, game_over=False):
         """Reseta o estado para uma nova fase ou reinicia tudo em caso de Game Over"""
+        # 🟢 REATIVA O SPAWN (2000ms = 2 segundos) sempre que o jogo reiniciar ou mudar de fase
+        pygame.time.set_timer(self.SPAWN_ENEMY_EVENT, 2000)
+
         if game_over:
             self.current_level = 1
             self.player = Player(20, 470)
@@ -194,20 +214,31 @@ class Game:
                 if event.type == self.SPAWN_ENEMY_EVENT:
                     year_map = {1: 1955, 2: 2015, 3: 1885}
                     fase_ano = year_map.get(self.current_level, 1955)
-                    img_atual = self.enemy_images.get(self.current_level, self.enemy_images.get(1))
                     
                     if fase_ano == 1885:
                         if not self.boss_spawned:
-                            novo_boss = EnemyFactory.create_boss(750, 460, img_atual)
+                            # 🟢 FORÇA O CARREGAMENTO DIRETO: Garante que o executável busque o caubói de 1885 sem depender do dicionário
+                            caminho_boss_1885 = obter_caminho_recurso("assets/inimigo_1885.png")
+                            img_boss_orig = pygame.image.load(caminho_boss_1885).convert_alpha()
+                            img_boss_final = pygame.transform.scale(img_boss_orig, (104, 130))
+                            
+                            novo_boss = EnemyFactory.create_boss(750, 460, img_boss_final)
                             self.enemies.append(novo_boss)
                             self.boss_spawned = True
+                            
+                            # 🛑 Desativa o timer de spawn para nascer APENAS o Boss
+                            pygame.time.set_timer(self.SPAWN_ENEMY_EVENT, 0)
+                            
                     elif fase_ano == 2015:
+                        img_atual = self.enemy_images.get(self.current_level, self.enemy_images.get(1))
                         if not self.boss_spawned:
                             biff_fugitivo = EnemyFactory.create_boss(800, 470, img_atual)
                             biff_fugitivo.speed = 2
                             self.enemies.append(biff_fugitivo)
                             self.boss_spawned = True
                     else:
+                        # Fase 1 (1955) - Continua spawnando capangas normalmente
+                        img_atual = self.enemy_images.get(self.current_level, self.enemy_images.get(1))
                         novo_invertido = EnemyFactory.create_enemy(fase_ano, 850, 470, img_atual)
                         self.enemies.append(novo_invertido)
 
@@ -276,13 +307,17 @@ class Game:
                             if self.collected_items < 3:
                                 print("🛡️ Buford Tannen ri do seu tiro!")
                             else:
-                                morreu = enemy.take_damage()
-                                if morreu:
-                                    if enemy in self.enemies:
-                                        self.enemies.remove(enemy)
+                                morreu = enemy.take_damage() 
+                                if morreu: 
+                                    if enemy in self.enemies: 
+                                        self.enemies.remove(enemy) 
                                     self.player.score += 1000 
-                                    self.tocar_musica_fundo(self.musica_vitoria)
-                                    self.game_state = "WIN"
+                                    
+                                    # 🟢 CORRIGIDO: Salva os recordes na vitória do jogador antes de mudar de tela!
+                                    self.db.save_score("Marty McFly", self.player.score)
+                                    
+                                    self.tocar_musica_fundo(self.musica_vitoria) 
+                                    self.game_state = "WIN" 
                     else:
                         if enemy in self.enemies:
                             self.enemies.remove(enemy)
@@ -315,6 +350,7 @@ class Game:
                     self.db.save_score("Marty McFly", self.player.score) 
                     self.reset_game(game_over=True)
                     self.game_state = "GAMEOVER"
+                    self.tocar_musica_fundo(self.musica_gameover)
                     return
 
         for item in self.items_on_screen[:]:

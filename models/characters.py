@@ -1,6 +1,20 @@
 import pygame
+import os
+import sys
 from models.entity import Entity
 from models.projectile import Shot
+
+def obter_caminho_recurso(caminho_relativo):
+    """ Retorna o caminho absoluto para o recurso usando o padrão oficial do PyInstaller """
+    try:
+        # Se for o executável, ele extrai tudo para o _MEIPASS (que já mapeia o _internal automaticamente no Python 3)
+        base_path = sys._MEIPASS
+    except Exception:
+        # Se for o VS Code, roda na raiz atual
+        base_path = os.path.abspath(".")
+    
+    caminho_limpo = caminho_relativo.lstrip("./").lstrip("../")
+    return os.path.join(base_path, caminho_limpo)
 
 class Player(Entity):
     def __init__(self, x: int, y: int):
@@ -27,7 +41,7 @@ class Player(Entity):
         self.rect.topleft = (x, y)
 
     def load_costumes(self):
-            """Carrega os 12 bonecos mantendo a proporção original com altura fixa de 83px"""
+            """Carrega os 12 bonecos mantendo a proporção original com altura fixa de 120px"""
             acoes = ["idle", "run", "jump", "shoot"]
             
             # 📐 Definimos apenas a ALTURA que você quer fixar no jogo
@@ -36,13 +50,15 @@ class Player(Entity):
             for fase in [1, 2, 3]:
                 for acao in acoes:
                     caminho = f"assets/player_f{fase}_{acao}.png"
+                    caminho_seguro = obter_caminho_recurso(caminho)
+                    
                     try:
-                        # 1. Carrega a imagem original com o tamanho original dela
-                        imagem_original = pygame.image.load(caminho).convert_alpha()
+                        # 🟢 CORRIGIDO: Agora carrega estritamente a variável 'caminho_seguro'
+                        imagem_original = pygame.image.load(caminho_seguro).convert_alpha()
                         largura_original = imagem_original.get_width()
                         altura_original = imagem_original.get_height()
                         
-                        # 2. 🧮 Calcula a proporção: quanto a imagem original precisa encolher ou esticar?
+                        # 2. 🧮 Calcula a proporção
                         proporcao = altura_desejada / altura_original
                         
                         # 3. Define a nova largura baseada na proporção daquela imagem específica
@@ -53,7 +69,7 @@ class Player(Entity):
                         self.sprites[fase][acao] = pygame.transform.scale(imagem_original, novo_tamanho)
                         
                     except Exception as e:
-                        print(f"⚠️ Não achei o boneco: {caminho}. Usando bloco reserva.")
+                        print(f"⚠️ Não achei o boneco: {caminho_seguro}. Usando bloco reserva. Erro: {e}")
                         # Fallback caso a imagem não exista (usa uma largura padrão de 60px)
                         superficie_reserva = pygame.Surface((60, altura_desejada))
                         cores = {1: (220, 20, 60), 2: (30, 144, 255), 3: (218, 165, 32)}
@@ -140,10 +156,18 @@ class Player(Entity):
 
 class Enemy(Entity):
     def __init__(self, x: int, y: int, image, speed: int = 5):
-        
         super().__init__(x, y, image_path=None) 
         
-        self.image = image
+        # 🟢 SEGURANÇA MÁXIMA: Se a imagem vier nula ou inválida por causa do PyInstaller,
+        # criamos uma superfície reserva vermelha para o executável NUNCA fechar com erro.
+        if image is None:
+            print(f"⚠️ Alerta Crítico: Imagem do inimigo veio vazia em ({x}, {y}). Criando reserva.")
+            self.image = pygame.Surface((50, 50))
+            self.image.fill((255, 0, 0)) # Quadrado vermelho de segurança
+        else:
+            self.image = image
+
+        # Agora o get_rect() nunca mais vai dar erro de 'NoneType'!
         self.rect = self.image.get_rect()
         self.x = x
         self.y = y
@@ -151,7 +175,6 @@ class Enemy(Entity):
         self.speed = speed
 
     def update_behavior(self):
-        """Faz o inimigo andar automaticamente para a esquerda"""
         self.move(-self.speed, 0)
 
 class Boss(Enemy):
